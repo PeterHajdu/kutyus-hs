@@ -12,11 +12,13 @@ newtype AuthorId = AuthorId B.ByteString
 data ContentType =
     Blob
 
+type BaseMessage = Message B.ByteString
+
 data Message a = Message
   { author :: !AuthorId
   , parent :: !(Maybe MessageId)
   , content_type :: !ContentType
-  , content :: !B.ByteString
+  , content :: !a
   }
 
 data Frame a = Frame
