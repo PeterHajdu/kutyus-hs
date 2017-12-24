@@ -26,6 +26,7 @@ library:
   source-dirs: src
   dependencies:
   - bytestring
+  - data-msgpack
 
 executables:
   kutyus-hs-exe:
@@ -48,3 +49,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - kutyus-hs
+    - data-msgpack
+    - bytestring
+    - hspec
+
