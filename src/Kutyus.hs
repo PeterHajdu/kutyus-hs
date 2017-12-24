@@ -8,6 +8,7 @@ module Kutyus
 
 import qualified Data.MessagePack as MP
 import qualified Data.ByteString.Lazy as B
+import Control.Monad
 
 newtype MessageId = MessageId B.ByteString deriving (Eq, Show)
 
@@ -36,5 +37,20 @@ data Frame a = Frame
 
 data UnpackError = InvalidVersion | FrameFormatError | MessageFormatError | InvalidSignature deriving (Eq, Show)
 
-unpackFrame :: B.ByteString -> Either UnpackError (Frame a)
-unpackFrame _ = Left InvalidVersion
+type RawFrame = (Int, B.ByteString, B.ByteString)
+
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither _ (Just val) = Right val
+maybeToEither err Nothing = Left err
+
+unpackFrame :: B.ByteString -> Either UnpackError (Frame B.ByteString)
+unpackFrame = unpackRawFrame >=> checkVersion >=> undefined
+
+unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
+unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
+                         in maybeToEither FrameFormatError maybeRawFrame
+
+checkVersion :: RawFrame -> Either UnpackError RawFrame
+checkVersion frame@(1, _, _) = Right frame
+checkVersion (_, _, _) = Left InvalidVersion
+

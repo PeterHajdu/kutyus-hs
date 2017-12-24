@@ -15,6 +15,11 @@ frameSpec =
       let maybeUnpackedMessage = unpackFrame messageWithInvalidVersion :: Either UnpackError BaseFrame
       maybeUnpackedMessage `shouldBe` (Left InvalidVersion)
 
+    it "fails to unpack messages with wrong format" $ do
+      let messageWithInvalidVersion = MP.pack ("message"::B.ByteString, "signature"::B.ByteString) :: B.ByteString
+      let maybeUnpackedMessage = unpackFrame messageWithInvalidVersion :: Either UnpackError BaseFrame
+      maybeUnpackedMessage `shouldBe` (Left FrameFormatError)
+
 main :: IO ()
 main = hspec $ do
   frameSpec
