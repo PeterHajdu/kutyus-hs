@@ -30,6 +30,17 @@ library:
   - ed25519
 
 executables:
+  generate-message:
+    main:                GenerateMessage.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - kutyus-hs
+    - bytestring
+
   generate-kutyus-keypair:
     main:                GenerateKeypair.hs
     source-dirs:         app
