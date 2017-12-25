@@ -30,8 +30,8 @@ library:
   - ed25519
 
 executables:
-  kutyus-hs-exe:
-    main:                Main.hs
+  generate-kutyus-keypair:
+    main:                GenerateKeypair.hs
     source-dirs:         app
     ghc-options:
     - -threaded
@@ -39,6 +39,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - kutyus-hs
+    - bytestring
 
 tests:
   kutyus-hs-test:
