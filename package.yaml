@@ -30,6 +30,17 @@ library:
   - ed25519
 
 executables:
+  check-message:
+    main:                CheckMessage.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - kutyus-hs
+    - bytestring
+
   generate-message:
     main:                GenerateMessage.hs
     source-dirs:         app
