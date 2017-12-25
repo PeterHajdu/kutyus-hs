@@ -27,6 +27,7 @@ library:
   dependencies:
   - bytestring
   - data-msgpack
+  - ed25519
 
 executables:
   kutyus-hs-exe:
@@ -52,4 +53,5 @@ tests:
     - data-msgpack
     - bytestring
     - hspec
+    - ed25519
 

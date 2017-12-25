@@ -12,10 +12,11 @@ import qualified Data.MessagePack as MP
 import qualified Data.ByteString.Lazy as B
 import Control.Monad
 import Data.Maybe
+import Crypto.Sign.Ed25519
 
 newtype MessageId = MessageId B.ByteString deriving (Eq, Show)
 
-newtype AuthorId = AuthorId B.ByteString deriving (Eq, Show)
+newtype AuthorId = AuthorId {pubKey :: B.ByteString} deriving (Eq, Show)
 
 data ContentType =
     Blob
@@ -52,7 +53,7 @@ maybeToEither _ (Just val) = Right val
 maybeToEither err Nothing = Left err
 
 unpackFrame :: B.ByteString -> Either UnpackError BaseFrame
-unpackFrame = unpackRawFrame >=> checkVersion >=> unpackMessage >=> checkSignature >=> undefined
+unpackFrame = unpackRawFrame >=> checkVersion >=> unpackMessage >=> checkSignature
 
 unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
@@ -63,10 +64,10 @@ checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (B.ByteString, [B.ByteString], B.ByteString, B.ByteString)
-unpackMessage :: RawFrame -> Either UnpackError BaseFrame
-unpackMessage (version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
-                                                  eitherBaseMessage = eitherRawMessage >>= parseRawMessage
-                                               in (\msg -> Frame version msg signature) <$> eitherBaseMessage
+unpackMessage :: RawFrame -> Either UnpackError (RawFrame, BaseFrame)
+unpackMessage rawFrame@(version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
+                                                           eitherBaseMessage = eitherRawMessage >>= parseRawMessage
+                                                        in (\msg -> (rawFrame, Frame version msg signature)) <$> eitherBaseMessage
 
 parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
 parseRawMessage (author, parent, contentType, content) =
@@ -76,5 +77,9 @@ parseContentType :: B.ByteString -> Either UnpackError ContentType
 parseContentType "\0" = Right Blob
 parseContentType _ = Left UnknownContentType
 
-checkSignature :: BaseFrame -> Either UnpackError BaseFrame
-checkSignature _ = Left InvalidSignature
+checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError BaseFrame
+checkSignature ((_, rawMessage, signature), base) = let key = B.toStrict ((pubKey . author . message) base)
+                                                     in if dverify (PublicKey key) (B.toStrict rawMessage) (Signature $ B.toStrict signature)
+                                                        then Right base
+                                                        else Left InvalidSignature
+

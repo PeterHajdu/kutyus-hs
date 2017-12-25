@@ -2,6 +2,8 @@
 
 import qualified Data.MessagePack as MP
 import qualified Data.ByteString.Lazy as B
+import Crypto.Sign.Ed25519
+import Data.Either
 
 import Test.Hspec
 
@@ -36,6 +38,16 @@ frameSpec =
       let messageWithInvalidSignature = MP.pack (1::Int, messageWithUnknownContentType, "invalid signature"::B.ByteString) :: B.ByteString
       let maybeUnpackedMessage = unpackFrame messageWithInvalidSignature :: Either UnpackError BaseFrame
       maybeUnpackedMessage `shouldBe` (Left UnknownContentType)
+
+    it "unpacks the message with valid signature" $ do
+      (pubKey, privKey) <- createKeypair
+      let serializedPubKey = B.fromStrict (unPublicKey pubKey)
+      let validMessage = MP.pack (serializedPubKey::B.ByteString, []::[B.ByteString], "\0"::B.ByteString, "example"::B.ByteString)
+      let validSignature = B.fromStrict $ unSignature $ dsign privKey (B.toStrict validMessage)
+      let messageWithInvalidSignature = MP.pack (1::Int, validMessage, validSignature::B.ByteString) :: B.ByteString
+      let maybeUnpackedMessage = unpackFrame messageWithInvalidSignature :: Either UnpackError BaseFrame
+      print maybeUnpackedMessage
+      (isRight maybeUnpackedMessage) `shouldBe` True
 
 main :: IO ()
 main = hspec $ do
