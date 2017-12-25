@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Kutyus
     ( Frame
     , Message
@@ -36,7 +38,12 @@ data Frame a = Frame
   , signature :: !B.ByteString
   } deriving (Eq, Show)
 
-data UnpackError = InvalidVersion | FrameFormatError | MessageFormatError | InvalidSignature deriving (Eq, Show)
+data UnpackError =
+    InvalidVersion
+  | FrameFormatError
+  | MessageFormatError
+  | InvalidSignature
+  | UnknownContentType deriving (Eq, Show)
 
 type RawFrame = (Int, B.ByteString, B.ByteString)
 
@@ -57,16 +64,17 @@ checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (B.ByteString, [B.ByteString], B.ByteString, B.ByteString)
 unpackMessage :: RawFrame -> Either UnpackError BaseFrame
-unpackMessage (version, message, signature) = let maybeRawMessage = MP.unpack message :: Maybe RawMessage
-                                                  maybeBaseMessage = unpackRawMessage <$> maybeRawMessage
-                                                  maybeBaseFrame = (\msg -> Frame version msg signature) <$> maybeBaseMessage
-                                               in maybeToEither MessageFormatError maybeBaseFrame
+unpackMessage (version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
+                                                  eitherBaseMessage = eitherRawMessage >>= parseRawMessage
+                                               in (\msg -> Frame version msg signature) <$> eitherBaseMessage
 
-unpackRawMessage :: RawMessage -> BaseMessage
-unpackRawMessage (author, parent, contentType, content) = Message (AuthorId author) (MessageId <$> listToMaybe parent) (parseContentType contentType) content
+parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
+parseRawMessage (author, parent, contentType, content) =
+  (\ctype -> Message (AuthorId author) (MessageId <$> listToMaybe parent) ctype content) <$> parseContentType contentType
 
-parseContentType :: B.ByteString -> ContentType
-parseContentType _ = Blob
+parseContentType :: B.ByteString -> Either UnpackError ContentType
+parseContentType "\0" = Right Blob
+parseContentType _ = Left UnknownContentType
 
 checkSignature :: BaseFrame -> Either UnpackError BaseFrame
 checkSignature _ = Left InvalidSignature

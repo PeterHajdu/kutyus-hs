@@ -31,6 +31,12 @@ frameSpec =
       let maybeUnpackedMessage = unpackFrame messageWithInvalidSignature :: Either UnpackError BaseFrame
       maybeUnpackedMessage `shouldBe` (Left InvalidSignature)
 
+    it "fails to unpack messages with unknown content type" $ do
+      let messageWithUnknownContentType = MP.pack ("authur"::B.ByteString, []::[B.ByteString], "\1"::B.ByteString, "example"::B.ByteString)
+      let messageWithInvalidSignature = MP.pack (1::Int, messageWithUnknownContentType, "invalid signature"::B.ByteString) :: B.ByteString
+      let maybeUnpackedMessage = unpackFrame messageWithInvalidSignature :: Either UnpackError BaseFrame
+      maybeUnpackedMessage `shouldBe` (Left UnknownContentType)
+
 main :: IO ()
 main = hspec $ do
   frameSpec
