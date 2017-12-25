@@ -9,6 +9,7 @@ module Kutyus
     , BaseMessage
     , ContentType(..)
     , AuthorId(..)
+    , generateKeypair
     ) where
 
 import qualified Data.MessagePack as MP
@@ -109,3 +110,9 @@ serializeMessage msg = MP.pack
   , (maybeToList $ raw <$> (parent msg))
   , (serializeContentType $ content_type msg)
   , content msg)
+
+generateKeypair :: IO (B.ByteString, B.ByteString)
+generateKeypair = do
+  (pub, priv) <- createKeypair
+  return ((B.fromStrict $ unPublicKey pub), (B.fromStrict $ unSecretKey priv))
+

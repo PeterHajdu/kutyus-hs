@@ -41,9 +41,9 @@ messageSpec =
       maybeUnpackedMessage `shouldBe` (Left UnknownContentType)
 
     it "is possible unpack a packed message" $ do
-      (pubKey, privKey) <- createKeypair
-      let message = Message (AuthorId $ (B.fromStrict . unPublicKey) pubKey) Nothing Blob "example"
-      let frame = packMessage (B.fromStrict . unSecretKey $ privKey) message
+      (pubKey, privKey) <- generateKeypair
+      let message = Message (AuthorId pubKey) Nothing Blob "example"
+      let frame = packMessage privKey message
       let (Right unpackedMessage) = unpackMessage frame
       unpackedMessage `shouldBe` message
 
