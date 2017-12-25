@@ -2,10 +2,13 @@
 
 module Kutyus
     ( Frame
-    , Message
+    , Message(..)
     , unpackFrame
+    , packMessage
     , UnpackError(..)
-    , BaseFrame
+    , BaseMessage
+    , ContentType(..)
+    , AuthorId(..)
     ) where
 
 import qualified Data.MessagePack as MP
@@ -14,9 +17,9 @@ import Control.Monad
 import Data.Maybe
 import Crypto.Sign.Ed25519
 
-newtype MessageId = MessageId B.ByteString deriving (Eq, Show)
+newtype MessageId = MessageId {raw :: B.ByteString} deriving (Eq, Show)
 
-newtype AuthorId = AuthorId {pubKey :: B.ByteString} deriving (Eq, Show)
+newtype AuthorId = AuthorId {publicKey :: B.ByteString} deriving (Eq, Show)
 
 data ContentType =
     Blob
@@ -52,8 +55,8 @@ maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just val) = Right val
 maybeToEither err Nothing = Left err
 
-unpackFrame :: B.ByteString -> Either UnpackError BaseFrame
-unpackFrame = unpackRawFrame >=> checkVersion >=> unpackMessage >=> checkSignature
+unpackFrame :: B.ByteString -> Either UnpackError BaseMessage
+unpackFrame = unpackRawFrame >=> checkVersion >=> unpackMessage >=> checkSignature >=> (Right . message)
 
 unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
@@ -77,9 +80,32 @@ parseContentType :: B.ByteString -> Either UnpackError ContentType
 parseContentType "\0" = Right Blob
 parseContentType _ = Left UnknownContentType
 
+serializeContentType :: ContentType -> B.ByteString
+serializeContentType Blob = "\0"
+
 checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError BaseFrame
-checkSignature ((_, rawMessage, signature), base) = let key = B.toStrict ((pubKey . author . message) base)
-                                                     in if dverify (PublicKey key) (B.toStrict rawMessage) (Signature $ B.toStrict signature)
+checkSignature ((_, rawMessage, signature), base) = let key = PublicKey $ B.toStrict (publicKey . author . message $ base)
+                                                        sig = Signature $ B.toStrict signature
+                                                        msg = B.toStrict rawMessage
+                                                     in if dverify key msg sig
                                                         then Right base
                                                         else Left InvalidSignature
 
+packMessage :: B.ByteString -> Message B.ByteString -> B.ByteString
+packMessage privKey message = let packedMessage = serializeMessage message :: B.ByteString
+                                  signature = signMessage privKey packedMessage :: B.ByteString
+                               in MP.pack (1::Int, packedMessage::B.ByteString, signature::B.ByteString)
+
+signMessage :: B.ByteString -> B.ByteString -> B.ByteString
+signMessage privKey rawMessage = let key = (SecretKey $ B.toStrict privKey)
+                                     msg = (B.toStrict rawMessage)
+                                     sig = dsign key msg
+                                  in B.fromStrict $ unSignature sig
+
+
+serializeMessage :: Message B.ByteString -> B.ByteString
+serializeMessage msg = MP.pack
+  ( (publicKey $ author msg)
+  , (maybeToList $ raw <$> (parent msg))
+  , (serializeContentType $ content_type msg)
+  , content msg)

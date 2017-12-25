@@ -54,4 +54,5 @@ tests:
     - bytestring
     - hspec
     - ed25519
+    - QuickCheck
 
