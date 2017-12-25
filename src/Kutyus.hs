@@ -3,7 +3,7 @@
 module Kutyus
     ( Frame
     , Message(..)
-    , unpackFrame
+    , unpackMessage
     , packMessage
     , UnpackError(..)
     , BaseMessage
@@ -55,8 +55,8 @@ maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just val) = Right val
 maybeToEither err Nothing = Left err
 
-unpackFrame :: B.ByteString -> Either UnpackError BaseMessage
-unpackFrame = unpackRawFrame >=> checkVersion >=> unpackMessage >=> checkSignature >=> (Right . message)
+unpackMessage :: B.ByteString -> Either UnpackError BaseMessage
+unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> (Right . message)
 
 unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
@@ -67,10 +67,10 @@ checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (B.ByteString, [B.ByteString], B.ByteString, B.ByteString)
-unpackMessage :: RawFrame -> Either UnpackError (RawFrame, BaseFrame)
-unpackMessage rawFrame@(version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
-                                                           eitherBaseMessage = eitherRawMessage >>= parseRawMessage
-                                                        in (\msg -> (rawFrame, Frame version msg signature)) <$> eitherBaseMessage
+unpackRawMessage :: RawFrame -> Either UnpackError (RawFrame, BaseFrame)
+unpackRawMessage rawFrame@(version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
+                                                              eitherBaseMessage = eitherRawMessage >>= parseRawMessage
+                                                           in (\msg -> (rawFrame, Frame version msg signature)) <$> eitherBaseMessage
 
 parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
 parseRawMessage (author, parent, contentType, content) =
