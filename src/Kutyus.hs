@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Kutyus
-    ( Frame
-    , Message(..)
+    ( Message(..)
     , unpackMessage
     , packMessage
     , UnpackError(..)
