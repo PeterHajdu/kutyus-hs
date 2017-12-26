@@ -11,18 +11,20 @@ module Kutyus
     , AuthorId(..)
     , generateKeypair
     , MessageId
+    , PublicKey(..)
+    , PrivateKey(..)
     ) where
 
 import qualified Data.MessagePack as MP
 import qualified Data.ByteString.Lazy as B
 import Control.Monad
 import Data.Maybe
-import Crypto.Sign.Ed25519
+import qualified Crypto.Sign.Ed25519 as ED
 import Crypto.Hash.SHA512
 
 newtype MessageId = MessageId {raw :: B.ByteString} deriving (Eq, Show)
 
-newtype AuthorId = AuthorId {publicKey :: B.ByteString} deriving (Eq, Show)
+newtype AuthorId = AuthorId {publicKey :: PublicKey} deriving (Eq, Show)
 
 data ContentType =
     Blob
@@ -80,7 +82,7 @@ unpackRawMessage rawFrame@(version, message, signature) = let eitherRawMessage =
 
 parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
 parseRawMessage (author, parent, contentType, content) =
-  (\ctype -> Message (AuthorId author) (MessageId <$> listToMaybe parent) ctype content) <$> parseContentType contentType
+  (\ctype -> Message (AuthorId $ PublicKey author) (MessageId <$> listToMaybe parent) ctype content) <$> parseContentType contentType
 
 parseContentType :: B.ByteString -> Either UnpackError ContentType
 parseContentType "\0" = Right Blob
@@ -90,34 +92,37 @@ serializeContentType :: ContentType -> B.ByteString
 serializeContentType Blob = "\0"
 
 checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError (MessageId, BaseFrame)
-checkSignature ((_, rawMessage, signature), base) = let key = PublicKey $ B.toStrict (publicKey . author . message $ base)
-                                                        sig = Signature $ B.toStrict signature
+checkSignature ((_, rawMessage, signature), base) = let key = ED.PublicKey $ B.toStrict (rawPublicKey . publicKey . author . message $ base)
+                                                        sig = ED.Signature $ B.toStrict signature
                                                         msgHash = hashlazy rawMessage
-                                                     in if dverify key msgHash sig
+                                                     in if ED.dverify key msgHash sig
                                                         then Right (MessageId $ B.fromStrict msgHash, base)
                                                         else Left InvalidSignature
 
-packMessage :: B.ByteString -> Message B.ByteString -> B.ByteString
+packMessage :: PrivateKey -> Message B.ByteString -> B.ByteString
 packMessage privKey message = let packedMessage = serializeMessage message :: B.ByteString
                                   signature = signMessage privKey packedMessage :: B.ByteString
                                in MP.pack (1::Int, packedMessage::B.ByteString, signature::B.ByteString)
 
-signMessage :: B.ByteString -> B.ByteString -> B.ByteString
-signMessage privKey rawMessage = let key = (SecretKey $ B.toStrict privKey)
+signMessage :: PrivateKey -> B.ByteString -> B.ByteString
+signMessage privKey rawMessage = let key = (ED.SecretKey $ B.toStrict $ rawPrivateKey privKey)
                                      msgHash = hashlazy rawMessage
-                                     sig = dsign key msgHash
-                                  in B.fromStrict $ unSignature sig
+                                     sig = ED.dsign key msgHash
+                                  in B.fromStrict $ ED.unSignature sig
 
 
 serializeMessage :: Message B.ByteString -> B.ByteString
 serializeMessage msg = MP.pack
-  ( (publicKey $ author msg)
+  ( (rawPublicKey $ publicKey $ author msg)
   , (maybeToList $ raw <$> (parent msg))
   , (serializeContentType $ content_type msg)
   , content msg)
 
-generateKeypair :: IO (B.ByteString, B.ByteString)
+newtype PrivateKey = PrivateKey {rawPrivateKey :: B.ByteString} deriving (Eq, Show)
+newtype PublicKey = PublicKey {rawPublicKey :: B.ByteString} deriving (Eq, Show)
+
+generateKeypair :: IO (PublicKey, PrivateKey)
 generateKeypair = do
-  (pub, priv) <- createKeypair
-  return ((B.fromStrict $ unPublicKey pub), (B.fromStrict $ unSecretKey priv))
+  (pub, priv) <- ED.createKeypair
+  return ((PublicKey $ B.fromStrict $ ED.unPublicKey pub), (PrivateKey $ B.fromStrict $ ED.unSecretKey priv))
 

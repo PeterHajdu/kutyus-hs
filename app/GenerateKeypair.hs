@@ -9,10 +9,10 @@ import Kutyus
 getFilename :: IO (Maybe String)
 getFilename = listToMaybe <$> getArgs
 
-writeKeys :: String -> (B.ByteString, B.ByteString) -> IO ()
+writeKeys :: String -> (PublicKey, PrivateKey) -> IO ()
 writeKeys filename (publicKey, privateKey) = do
-  B.writeFile (filename ++ ".pub") publicKey
-  B.writeFile (filename ++ ".priv") privateKey
+  B.writeFile (filename ++ ".pub") (rawPublicKey publicKey)
+  B.writeFile (filename ++ ".priv") (rawPrivateKey privateKey)
 
 usage :: IO ()
 usage = putStrLn "generate-kutyus-keypair <keyname>"

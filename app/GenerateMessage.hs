@@ -22,7 +22,7 @@ getKeys = do
 usage :: IO ()
 usage = putStrLn "generate-message <keyname>"
 
-generateMessage :: B.ByteString -> B.ByteString -> IO ()
+generateMessage :: PublicKey -> PrivateKey -> IO ()
 generateMessage pub priv = do
   content <- B.getContents
   let msg = packMessage priv (Message (AuthorId pub) Nothing Blob content)
@@ -33,4 +33,4 @@ main = do
   keys <- getKeys
   case keys of
     Nothing -> usage
-    Just (pub, priv) -> generateMessage pub priv
+    Just (pub, priv) -> generateMessage (PublicKey pub) (PrivateKey priv)
