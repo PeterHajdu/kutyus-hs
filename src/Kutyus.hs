@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Kutyus
-    ( Frame
+    ( module Kutyus.Crypto
+    , Frame
     , Message(..)
     , unpackMessage
     , packMessage
@@ -15,14 +16,14 @@ module Kutyus
     , PrivateKey(..)
     ) where
 
+import Kutyus.Crypto
 import qualified Data.MessagePack as MP
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString as S
 import Control.Monad
 import Data.Maybe
-import qualified Crypto.Sign.Ed25519 as ED
-import Crypto.Hash.SHA512
 
-newtype MessageId = MessageId {raw :: B.ByteString} deriving (Eq, Show)
+newtype MessageId = MessageId {raw :: S.ByteString} deriving (Eq, Show)
 
 newtype AuthorId = AuthorId {publicKey :: PublicKey} deriving (Eq, Show)
 
@@ -30,7 +31,7 @@ data ContentType =
     Blob
     deriving (Eq, Show)
 
-type BaseMessage = Message B.ByteString
+type BaseMessage = Message L.ByteString
 
 data Message a = Message
   { author :: !AuthorId
@@ -39,12 +40,12 @@ data Message a = Message
   , content :: !a
   } deriving (Eq, Show)
 
-type BaseFrame = Frame B.ByteString
+type BaseFrame = Frame L.ByteString
 
 data Frame a = Frame
   { version :: !Int
   , message :: Message a
-  , signature :: !B.ByteString
+  , signature :: Signature
   } deriving (Eq, Show)
 
 data UnpackError =
@@ -54,19 +55,19 @@ data UnpackError =
   | InvalidSignature
   | UnknownContentType deriving (Eq, Show)
 
-type RawFrame = (Int, B.ByteString, B.ByteString)
+type RawFrame = (Int, L.ByteString, L.ByteString)
 
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just val) = Right val
 maybeToEither err Nothing = Left err
 
-unpackMessage :: B.ByteString -> Either UnpackError (MessageId, BaseMessage)
+unpackMessage :: L.ByteString -> Either UnpackError (MessageId, BaseMessage)
 unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> constructMessageAndId
 
 constructMessageAndId :: (MessageId, BaseFrame) -> Either UnpackError (MessageId, BaseMessage)
 constructMessageAndId (msgId, frame) = Right $ (msgId, message frame)
 
-unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
+unpackRawFrame :: L.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
                          in maybeToEither FrameFormatError maybeRawFrame
 
@@ -74,55 +75,41 @@ checkVersion :: RawFrame -> Either UnpackError RawFrame
 checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
-type RawMessage = (B.ByteString, [B.ByteString], B.ByteString, B.ByteString)
+type RawMessage = (L.ByteString, [S.ByteString], L.ByteString, L.ByteString)
 unpackRawMessage :: RawFrame -> Either UnpackError (RawFrame, BaseFrame)
-unpackRawMessage rawFrame@(version, message, signature) = let eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
+unpackRawMessage rawFrame@(version, message, signature) = let sig = sigFromLazy signature
+                                                              eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
                                                               eitherBaseMessage = eitherRawMessage >>= parseRawMessage
-                                                           in (\msg -> (rawFrame, Frame version msg signature)) <$> eitherBaseMessage
+                                                           in (\msg -> (rawFrame, Frame version msg sig)) <$> eitherBaseMessage
 
 parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
 parseRawMessage (author, parent, contentType, content) =
-  (\ctype -> Message (AuthorId $ PublicKey author) (MessageId <$> listToMaybe parent) ctype content) <$> parseContentType contentType
+  (\ctype -> Message (AuthorId $ pubKeyFromLazy author) (MessageId <$> listToMaybe parent) ctype content) <$> parseContentType contentType
 
-parseContentType :: B.ByteString -> Either UnpackError ContentType
+parseContentType :: L.ByteString -> Either UnpackError ContentType
 parseContentType "\0" = Right Blob
 parseContentType _ = Left UnknownContentType
 
-serializeContentType :: ContentType -> B.ByteString
+serializeContentType :: ContentType -> L.ByteString
 serializeContentType Blob = "\0"
 
 checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError (MessageId, BaseFrame)
-checkSignature ((_, rawMessage, signature), base) = let key = ED.PublicKey $ B.toStrict (rawPublicKey . publicKey . author . message $ base)
-                                                        sig = ED.Signature $ B.toStrict signature
-                                                        msgHash = hashlazy rawMessage
-                                                     in if ED.dverify key msgHash sig
-                                                        then Right (MessageId $ B.fromStrict msgHash, base)
-                                                        else Left InvalidSignature
+checkSignature ((_, rawMessage, _), base) = let key = publicKey . author . message $ base
+                                                msgId = digest rawMessage
+                                             in if verifySignature key (signature base) msgId
+                                                then Right (MessageId $ rawDigest msgId, base)
+                                                else Left InvalidSignature
 
-packMessage :: PrivateKey -> Message B.ByteString -> B.ByteString
-packMessage privKey message = let packedMessage = serializeMessage message :: B.ByteString
-                                  signature = signMessage privKey packedMessage :: B.ByteString
-                               in MP.pack (1::Int, packedMessage::B.ByteString, signature::B.ByteString)
+packMessage :: PrivateKey -> Message L.ByteString -> L.ByteString
+packMessage privKey message = let packedMessage = serializeMessage message
+                                  signature = sign privKey (digest packedMessage)
+                               in MP.pack (1::Int, packedMessage::L.ByteString, (rawSignature signature)::S.ByteString)
 
-signMessage :: PrivateKey -> B.ByteString -> B.ByteString
-signMessage privKey rawMessage = let key = (ED.SecretKey $ B.toStrict $ rawPrivateKey privKey)
-                                     msgHash = hashlazy rawMessage
-                                     sig = ED.dsign key msgHash
-                                  in B.fromStrict $ ED.unSignature sig
-
-
-serializeMessage :: Message B.ByteString -> B.ByteString
+serializeMessage :: Message L.ByteString -> L.ByteString
 serializeMessage msg = MP.pack
   ( (rawPublicKey $ publicKey $ author msg)
   , (maybeToList $ raw <$> (parent msg))
   , (serializeContentType $ content_type msg)
-  , content msg)
-
-newtype PrivateKey = PrivateKey {rawPrivateKey :: B.ByteString} deriving (Eq, Show)
-newtype PublicKey = PublicKey {rawPublicKey :: B.ByteString} deriving (Eq, Show)
-
-generateKeypair :: IO (PublicKey, PrivateKey)
-generateKeypair = do
-  (pub, priv) <- ED.createKeypair
-  return ((PublicKey $ B.fromStrict $ ED.unPublicKey pub), (PrivateKey $ B.fromStrict $ ED.unSecretKey priv))
+  , content msg
+  )
 

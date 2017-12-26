@@ -1,18 +1,19 @@
 module Main where
 
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
 import System.Environment (getArgs)
 import Data.Maybe
 
 import Kutyus
 
-readKeys :: String -> IO (Maybe (B.ByteString, B.ByteString))
+readKeys :: String -> IO (Maybe (S.ByteString, S.ByteString))
 readKeys keyname = do
-  pubkey <- B.readFile (keyname ++ ".pub")
-  privkey <- B.readFile (keyname ++ ".priv")
+  pubkey <- S.readFile (keyname ++ ".pub")
+  privkey <- S.readFile (keyname ++ ".priv")
   return $ Just (pubkey, privkey)
 
-getKeys :: IO (Maybe (B.ByteString, B.ByteString))
+getKeys :: IO (Maybe (S.ByteString, S.ByteString))
 getKeys = do
   maybeKeyname <- listToMaybe <$> getArgs
   case maybeKeyname of
@@ -24,9 +25,9 @@ usage = putStrLn "generate-message <keyname>"
 
 generateMessage :: PublicKey -> PrivateKey -> IO ()
 generateMessage pub priv = do
-  content <- B.getContents
+  content <- L.getContents
   let msg = packMessage priv (Message (AuthorId pub) Nothing Blob content)
-  B.putStrLn msg
+  L.putStrLn msg
 
 main :: IO ()
 main = do
@@ -34,3 +35,4 @@ main = do
   case keys of
     Nothing -> usage
     Just (pub, priv) -> generateMessage (PublicKey pub) (PrivateKey priv)
+

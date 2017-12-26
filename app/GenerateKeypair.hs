@@ -1,6 +1,6 @@
 module Main where
 
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString as B
 import System.Environment (getArgs)
 import Data.Maybe
 
