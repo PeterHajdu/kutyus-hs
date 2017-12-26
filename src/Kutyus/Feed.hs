@@ -1,4 +1,6 @@
-module Kutyus.Feed where
+module Kutyus.Feed
+  ( Feed
+  ) where
 
 import Kutyus.Message
 

@@ -1,6 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Kutyus.Message where
+module Kutyus.Message
+  ( Message(..)
+  , unpackMessage
+  , packMessage
+  , UnpackError(..)
+  , BaseMessage
+  , ContentType(..)
+  , AuthorId(..)
+  , generateKeypair
+  , MessageId
+  , PublicKey(..)
+  , PrivateKey(..)
+  , ) where
 
 import Kutyus.Crypto
 import qualified Data.MessagePack as MP
