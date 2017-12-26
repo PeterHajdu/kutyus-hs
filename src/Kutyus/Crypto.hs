@@ -1,4 +1,15 @@
-module Kutyus.Crypto where
+module Kutyus.Crypto
+  ( PrivateKey(..)
+  , PublicKey(..)
+  , Signature(..)
+  , Digest(..)
+  , pubKeyFromLazy
+  , sigFromLazy
+  , digest
+  , verifySignature
+  , sign
+  , generateKeypair
+  ) where
 
 import qualified Crypto.Sign.Ed25519 as ED
 import Crypto.Hash.SHA512

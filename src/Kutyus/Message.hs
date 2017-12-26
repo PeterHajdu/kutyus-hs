@@ -12,7 +12,7 @@ module Kutyus.Message
   , MessageId
   , PublicKey(..)
   , PrivateKey(..)
-  , ) where
+  ) where
 
 import Kutyus.Crypto
 import qualified Data.MessagePack as MP
