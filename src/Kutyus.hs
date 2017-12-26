@@ -89,7 +89,7 @@ parseContentType :: L.ByteString -> Either UnpackError ContentType
 parseContentType "\0" = Right Blob
 parseContentType _ = Left UnknownContentType
 
-serializeContentType :: ContentType -> L.ByteString
+serializeContentType :: ContentType -> S.ByteString
 serializeContentType Blob = "\0"
 
 checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError (MessageId, BaseFrame)
