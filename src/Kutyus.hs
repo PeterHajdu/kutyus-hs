@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Kutyus
-    ( module Kutyus.Crypto
-    , Frame
+    ( Frame
     , Message(..)
     , unpackMessage
     , packMessage
