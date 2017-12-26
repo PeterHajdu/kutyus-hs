@@ -28,6 +28,7 @@ library:
   - bytestring
   - data-msgpack
   - ed25519
+  - cryptohash-sha512
 
 executables:
   check-message:
@@ -78,4 +79,3 @@ tests:
     - hspec
     - ed25519
     - QuickCheck
-

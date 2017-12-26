@@ -17,6 +17,7 @@ import qualified Data.ByteString.Lazy as B
 import Control.Monad
 import Data.Maybe
 import Crypto.Sign.Ed25519
+import Crypto.Hash.SHA512
 
 newtype MessageId = MessageId {raw :: B.ByteString} deriving (Eq, Show)
 
@@ -87,8 +88,8 @@ serializeContentType Blob = "\0"
 checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError BaseFrame
 checkSignature ((_, rawMessage, signature), base) = let key = PublicKey $ B.toStrict (publicKey . author . message $ base)
                                                         sig = Signature $ B.toStrict signature
-                                                        msg = B.toStrict rawMessage
-                                                     in if dverify key msg sig
+                                                        msgHash = hashlazy rawMessage
+                                                     in if dverify key msgHash sig
                                                         then Right base
                                                         else Left InvalidSignature
 
@@ -99,8 +100,8 @@ packMessage privKey message = let packedMessage = serializeMessage message :: B.
 
 signMessage :: B.ByteString -> B.ByteString -> B.ByteString
 signMessage privKey rawMessage = let key = (SecretKey $ B.toStrict privKey)
-                                     msg = (B.toStrict rawMessage)
-                                     sig = dsign key msg
+                                     msgHash = hashlazy rawMessage
+                                     sig = dsign key msgHash
                                   in B.fromStrict $ unSignature sig
 
 
