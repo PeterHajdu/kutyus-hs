@@ -10,6 +10,7 @@ module Kutyus
     , ContentType(..)
     , AuthorId(..)
     , generateKeypair
+    , MessageId
     ) where
 
 import qualified Data.MessagePack as MP
@@ -57,8 +58,11 @@ maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just val) = Right val
 maybeToEither err Nothing = Left err
 
-unpackMessage :: B.ByteString -> Either UnpackError BaseMessage
-unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> (Right . message)
+unpackMessage :: B.ByteString -> Either UnpackError (MessageId, BaseMessage)
+unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> constructMessageAndId
+
+constructMessageAndId :: (MessageId, BaseFrame) -> Either UnpackError (MessageId, BaseMessage)
+constructMessageAndId (msgId, frame) = Right $ (msgId, message frame)
 
 unpackRawFrame :: B.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
@@ -85,12 +89,12 @@ parseContentType _ = Left UnknownContentType
 serializeContentType :: ContentType -> B.ByteString
 serializeContentType Blob = "\0"
 
-checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError BaseFrame
+checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError (MessageId, BaseFrame)
 checkSignature ((_, rawMessage, signature), base) = let key = PublicKey $ B.toStrict (publicKey . author . message $ base)
                                                         sig = Signature $ B.toStrict signature
                                                         msgHash = hashlazy rawMessage
                                                      in if dverify key msgHash sig
-                                                        then Right base
+                                                        then Right (MessageId $ B.fromStrict msgHash, base)
                                                         else Left InvalidSignature
 
 packMessage :: B.ByteString -> Message B.ByteString -> B.ByteString

@@ -4,8 +4,9 @@ import qualified Data.ByteString.Lazy as B
 
 import Kutyus
 
-showMessage :: Message B.ByteString -> IO ()
-showMessage (Message author parent contentType content) = do
+showMessage :: (MessageId, Message B.ByteString) -> IO ()
+showMessage (msgId, (Message author parent contentType content)) = do
+  print $ msgId
   print $ author
   print $ parent
   print $ contentType
