@@ -29,6 +29,7 @@ library:
   - data-msgpack
   - ed25519
   - cryptohash-sha512
+  - base64-bytestring
 
 executables:
   check-message:

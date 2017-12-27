@@ -8,9 +8,14 @@ module Kutyus
     , ContentType(..)
     , AuthorId(..)
     , generateKeypair
-    , MessageId
+    , MessageId(..)
     , PublicKey(..)
     , PrivateKey(..)
+    , messageIdToBase64
+    , base64ToMessageId
+    , Base64(..)
+    , authorIdToBase64
+    , base64ToAuthorId
     ) where
 
 import Kutyus.Crypto

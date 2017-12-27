@@ -9,9 +9,14 @@ module Kutyus.Message
   , ContentType(..)
   , AuthorId(..)
   , generateKeypair
-  , MessageId
+  , MessageId(..)
   , PublicKey(..)
   , PrivateKey(..)
+  , messageIdToBase64
+  , base64ToMessageId
+  , authorIdToBase64
+  , base64ToAuthorId
+  , Base64(..)
   ) where
 
 import Kutyus.Crypto
@@ -20,8 +25,23 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as S
 import Control.Monad
 import Data.Maybe
+import qualified Data.ByteString.Base64 as B64
 
+newtype Base64 = Base64 {rawBase64 :: S.ByteString} deriving (Eq, Show)
 newtype MessageId = MessageId {raw :: S.ByteString} deriving (Eq, Show)
+
+messageIdToBase64 :: MessageId -> Base64
+messageIdToBase64 (MessageId raw) = Base64 $ B64.encode raw
+
+base64ToMessageId :: Base64 -> Maybe MessageId
+base64ToMessageId (Base64 raw) = MessageId <$> (eitherToMaybe $ B64.decode raw)
+
+authorIdToBase64 :: AuthorId -> Base64
+authorIdToBase64 (AuthorId (PublicKey raw)) = Base64 $ B64.encode raw
+
+base64ToAuthorId :: Base64 -> Maybe AuthorId
+base64ToAuthorId (Base64 raw) = (AuthorId . PublicKey) <$> (eitherToMaybe $ B64.decode raw)
+
 newtype AuthorId = AuthorId {publicKey :: PublicKey} deriving (Eq, Show)
 
 data ContentType =
@@ -53,6 +73,10 @@ data UnpackError =
   | UnknownContentType deriving (Eq, Show)
 
 type RawFrame = (Int, L.ByteString, L.ByteString)
+
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Left _) = Nothing
+eitherToMaybe (Right val) = Just val
 
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just val) = Right val

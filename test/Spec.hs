@@ -2,7 +2,7 @@
 
 import qualified Data.MessagePack as MP
 import qualified Data.ByteString.Lazy as B
-import Crypto.Sign.Ed25519
+import qualified Crypto.Sign.Ed25519 as ED
 import Data.Either
 
 import Test.Hspec
@@ -47,6 +47,26 @@ messageSpec =
       let (Right (_, unpackedMessage)) = unpackMessage frame
       unpackedMessage `shouldBe` message
 
+idSpec :: Spec
+idSpec =
+  describe "ids" $ do
+    let rawBytestring = "32j0wejfwiejfoj"
+    let expectedBase64 = Base64 "MzJqMHdlamZ3aWVqZm9q"
+
+    describe "messageid" $ do
+      it "can be converted to base64" $ do
+        expectedBase64 `shouldBe` (messageIdToBase64 $ MessageId rawBytestring)
+      it "can be created from base64" $ do
+        (Just $ MessageId rawBytestring) `shouldBe` (base64ToMessageId expectedBase64)
+
+    describe "authorid" $ do
+      it "can be converted to base64" $ do
+        expectedBase64 `shouldBe` (authorIdToBase64 $ AuthorId $ PublicKey rawBytestring)
+      it "can be created from base64" $ do
+        (Just $ AuthorId $ PublicKey rawBytestring) `shouldBe` (base64ToAuthorId expectedBase64)
 
 main :: IO ()
-main = hspec messageSpec
+main =
+  hspec $ do
+    messageSpec
+    idSpec
