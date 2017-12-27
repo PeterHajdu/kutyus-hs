@@ -26,7 +26,7 @@ usage = putStrLn "generate-message <keyname>"
 generateMessage :: PublicKey -> PrivateKey -> IO ()
 generateMessage pub priv = do
   content <- L.getContents
-  let msg = packMessage priv (Message (AuthorId pub) Nothing Blob content)
+  let (_, msg) = packMessage priv (Message (AuthorId pub) Nothing Blob content)
   L.putStrLn msg
 
 main :: IO ()

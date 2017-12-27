@@ -121,10 +121,12 @@ checkSignature ((_, rawMessage, _), base) = let key = publicKey . author . messa
                                                 then Right (MessageId $ rawDigest msgId, base)
                                                 else Left InvalidSignature
 
-packMessage :: PrivateKey -> Message L.ByteString -> L.ByteString
+packMessage :: PrivateKey -> Message L.ByteString -> (MessageId, L.ByteString)
 packMessage privKey message = let packedMessage = serializeMessage message
-                                  signature = sign privKey (digest packedMessage)
-                               in MP.pack (1::Int, packedMessage::L.ByteString, (rawSignature signature)::S.ByteString)
+                                  msgDigest = digest packedMessage
+                                  signature = sign privKey msgDigest
+                                  msgId = MessageId $ rawDigest msgDigest
+                               in (msgId, MP.pack (1::Int, packedMessage::L.ByteString, (rawSignature signature)::S.ByteString))
 
 serializeMessage :: Message L.ByteString -> L.ByteString
 serializeMessage msg = MP.pack

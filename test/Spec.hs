@@ -43,7 +43,7 @@ messageSpec =
     it "is possible unpack a packed message" $ do
       (pubKey, privKey) <- generateKeypair
       let message = Message (AuthorId pubKey) Nothing Blob "example"
-      let frame = packMessage privKey message
+      let (_, frame) = packMessage privKey message
       let (Right (_, unpackedMessage)) = unpackMessage frame
       unpackedMessage `shouldBe` message
 
