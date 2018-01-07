@@ -30,6 +30,9 @@ library:
   - ed25519
   - cryptohash-sha512
   - base64-bytestring
+  - network
+  - network-multicast
+  - stm
 
 executables:
   vau:
@@ -109,3 +112,7 @@ tests:
     - hspec
     - ed25519
     - QuickCheck
+    - mtl
+    - transformers
+    - stm
+    - network-multicast

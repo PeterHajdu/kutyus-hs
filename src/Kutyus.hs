@@ -16,9 +16,16 @@ module Kutyus
     , Base64(..)
     , authorIdToBase64
     , base64ToAuthorId
+    , startBroadcastSender
+    , startBroadcastReceiver
+    , KutyusNetwork(..)
+    , Sender(..)
+    , Receiver(..)
+    , BroadcastChannel
     ) where
 
 import Kutyus.Crypto
 import Kutyus.Message
 import Kutyus.Feed
+import Kutyus.Network
 
