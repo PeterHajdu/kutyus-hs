@@ -111,7 +111,6 @@ tests:
     - bytestring
     - hspec
     - ed25519
-    - QuickCheck
     - mtl
     - transformers
     - stm
