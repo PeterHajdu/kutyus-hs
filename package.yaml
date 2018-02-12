@@ -36,7 +36,7 @@ library:
 
 executables:
   vau:
-    main:                Vau.hs
+    main:                vau/Main.hs
     source-dirs:         app
     ghc-options:
     - -threaded
@@ -52,7 +52,7 @@ executables:
     - stm
 
   kutyus-db:
-    main:                Db.hs
+    main:                db/Main.hs
     source-dirs:         app
     ghc-options:
     - -threaded
@@ -63,20 +63,10 @@ executables:
     - bytestring
     - sqlite-simple
     - text
-
-  check-message:
-    main:                CheckMessage.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - kutyus-hs
-    - bytestring
+    - stm
 
   generate-message:
-    main:                GenerateMessage.hs
+    main:                generatemessage/Main.hs
     source-dirs:         app
     ghc-options:
     - -threaded
@@ -87,7 +77,7 @@ executables:
     - bytestring
 
   generate-kutyus-keypair:
-    main:                GenerateKeypair.hs
+    main:                generatekey/Main.hs
     source-dirs:         app
     ghc-options:
     - -threaded

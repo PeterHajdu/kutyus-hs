@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+module Main where
 
 import Kutyus
-import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM
 import Control.Monad (forever)
 import Control.Concurrent (forkIO)
