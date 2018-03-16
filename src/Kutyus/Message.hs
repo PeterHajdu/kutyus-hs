@@ -61,9 +61,9 @@ data Message a = Message
 
 data FrameState = Unchecked | ValidFrame
 
-data Frame (fs :: FrameState) a = Frame
+data Frame (fs :: FrameState) = Frame
   { version :: !Int
-  , message :: Message a
+  , message :: Message L.ByteString
   , messageId :: !MessageId
   , signature :: !Signature
   } deriving (Eq, Show)
@@ -87,8 +87,7 @@ maybeToEither err Nothing = Left err
 unpackMessage :: L.ByteString -> Either UnpackError (MessageId, BaseMessage)
 unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> constructMessageAndId
 
-type BaseFrame fs = Frame fs L.ByteString
-constructMessageAndId :: BaseFrame 'ValidFrame -> Either UnpackError (MessageId, BaseMessage)
+constructMessageAndId :: Frame 'ValidFrame -> Either UnpackError (MessageId, BaseMessage)
 constructMessageAndId frame = Right $ (messageId frame, message frame)
 
 type RawFrame = (Int, L.ByteString, L.ByteString)
@@ -101,7 +100,7 @@ checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (L.ByteString, [S.ByteString], L.ByteString, L.ByteString)
-unpackRawMessage :: RawFrame -> Either UnpackError (BaseFrame Unchecked)
+unpackRawMessage :: RawFrame -> Either UnpackError (Frame Unchecked)
 unpackRawMessage rawFrame@(version, message, signature) = let sig = sigFromLazy signature
                                                               eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
                                                               msgId = MessageId . rawDigest $ digest message
@@ -121,7 +120,7 @@ parseContentType _ = Left UnknownContentType
 serializeContentType :: ContentType -> S.ByteString
 serializeContentType Blob = "\0"
 
-checkSignature :: BaseFrame 'Unchecked -> Either UnpackError (BaseFrame 'ValidFrame)
+checkSignature :: Frame 'Unchecked -> Either UnpackError (Frame 'ValidFrame)
 checkSignature base@(Frame v m mid s) = let key = publicKey . author . message $ base
                       in if verifySignature key (signature base) (Digest $ raw $ messageId base)
                          then Right (Frame v m mid s)
