@@ -57,12 +57,11 @@ data Message a = Message
   , content :: !a
   } deriving (Eq, Show)
 
-type BaseFrame = Frame L.ByteString
-
 data Frame a = Frame
   { version :: !Int
   , message :: Message a
-  , signature :: Signature
+  , messageId :: !MessageId
+  , signature :: !Signature
   } deriving (Eq, Show)
 
 data UnpackError =
@@ -72,7 +71,6 @@ data UnpackError =
   | InvalidSignature
   | UnknownContentType deriving (Eq, Show)
 
-type RawFrame = (Int, L.ByteString, L.ByteString)
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe (Left _) = Nothing
@@ -85,9 +83,11 @@ maybeToEither err Nothing = Left err
 unpackMessage :: L.ByteString -> Either UnpackError (MessageId, BaseMessage)
 unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> constructMessageAndId
 
-constructMessageAndId :: (MessageId, BaseFrame) -> Either UnpackError (MessageId, BaseMessage)
-constructMessageAndId (msgId, frame) = Right $ (msgId, message frame)
+type BaseFrame = Frame L.ByteString
+constructMessageAndId :: BaseFrame -> Either UnpackError (MessageId, BaseMessage)
+constructMessageAndId frame = Right $ (messageId frame, message frame)
 
+type RawFrame = (Int, L.ByteString, L.ByteString)
 unpackRawFrame :: L.ByteString -> Either UnpackError RawFrame
 unpackRawFrame buffer = let maybeRawFrame = MP.unpack buffer :: Maybe RawFrame
                          in maybeToEither FrameFormatError maybeRawFrame
@@ -97,11 +97,14 @@ checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (L.ByteString, [S.ByteString], L.ByteString, L.ByteString)
-unpackRawMessage :: RawFrame -> Either UnpackError (RawFrame, BaseFrame)
+unpackRawMessage :: RawFrame -> Either UnpackError BaseFrame
 unpackRawMessage rawFrame@(version, message, signature) = let sig = sigFromLazy signature
                                                               eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
+                                                              msgId = MessageId . rawDigest $ digest message
                                                               eitherBaseMessage = eitherRawMessage >>= parseRawMessage
-                                                           in (\msg -> (rawFrame, Frame version msg sig)) <$> eitherBaseMessage
+
+
+                                                           in (\msg -> Frame version msg msgId sig) <$> eitherBaseMessage
 
 parseRawMessage :: RawMessage -> Either UnpackError BaseMessage
 parseRawMessage (author, parent, contentType, content) =
@@ -114,12 +117,11 @@ parseContentType _ = Left UnknownContentType
 serializeContentType :: ContentType -> S.ByteString
 serializeContentType Blob = "\0"
 
-checkSignature :: (RawFrame, BaseFrame) -> Either UnpackError (MessageId, BaseFrame)
-checkSignature ((_, rawMessage, _), base) = let key = publicKey . author . message $ base
-                                                msgId = digest rawMessage
-                                             in if verifySignature key (signature base) msgId
-                                                then Right (MessageId $ rawDigest msgId, base)
-                                                else Left InvalidSignature
+checkSignature :: BaseFrame -> Either UnpackError BaseFrame
+checkSignature base = let key = publicKey . author . message $ base
+                      in if verifySignature key (signature base) (Digest $ raw $ messageId base)
+                         then Right base
+                         else Left InvalidSignature
 
 packMessage :: PrivateKey -> Message L.ByteString -> (MessageId, L.ByteString)
 packMessage privKey message = let packedMessage = serializeMessage message
