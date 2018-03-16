@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Kutyus.Message
   ( Message(..)
@@ -57,7 +59,9 @@ data Message a = Message
   , content :: !a
   } deriving (Eq, Show)
 
-data Frame a = Frame
+data FrameState = Unchecked | ValidFrame
+
+data Frame (fs :: FrameState) a = Frame
   { version :: !Int
   , message :: Message a
   , messageId :: !MessageId
@@ -83,8 +87,8 @@ maybeToEither err Nothing = Left err
 unpackMessage :: L.ByteString -> Either UnpackError (MessageId, BaseMessage)
 unpackMessage = unpackRawFrame >=> checkVersion >=> unpackRawMessage >=> checkSignature >=> constructMessageAndId
 
-type BaseFrame = Frame L.ByteString
-constructMessageAndId :: BaseFrame -> Either UnpackError (MessageId, BaseMessage)
+type BaseFrame fs = Frame fs L.ByteString
+constructMessageAndId :: BaseFrame 'ValidFrame -> Either UnpackError (MessageId, BaseMessage)
 constructMessageAndId frame = Right $ (messageId frame, message frame)
 
 type RawFrame = (Int, L.ByteString, L.ByteString)
@@ -97,7 +101,7 @@ checkVersion frame@(1, _, _) = Right frame
 checkVersion (_, _, _) = Left InvalidVersion
 
 type RawMessage = (L.ByteString, [S.ByteString], L.ByteString, L.ByteString)
-unpackRawMessage :: RawFrame -> Either UnpackError BaseFrame
+unpackRawMessage :: RawFrame -> Either UnpackError (BaseFrame Unchecked)
 unpackRawMessage rawFrame@(version, message, signature) = let sig = sigFromLazy signature
                                                               eitherRawMessage = maybeToEither MessageFormatError (MP.unpack message :: Maybe RawMessage)
                                                               msgId = MessageId . rawDigest $ digest message
@@ -117,10 +121,10 @@ parseContentType _ = Left UnknownContentType
 serializeContentType :: ContentType -> S.ByteString
 serializeContentType Blob = "\0"
 
-checkSignature :: BaseFrame -> Either UnpackError BaseFrame
-checkSignature base = let key = publicKey . author . message $ base
+checkSignature :: BaseFrame 'Unchecked -> Either UnpackError (BaseFrame 'ValidFrame)
+checkSignature base@(Frame v m mid s) = let key = publicKey . author . message $ base
                       in if verifySignature key (signature base) (Digest $ raw $ messageId base)
-                         then Right base
+                         then Right (Frame v m mid s)
                          else Left InvalidSignature
 
 packMessage :: PrivateKey -> Message L.ByteString -> (MessageId, L.ByteString)
